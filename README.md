@@ -4,6 +4,7 @@
 [![Image Size](https://img.shields.io/docker/image-size/kennytian/milvus-lite/latest)](https://hub.docker.com/r/kennytian/milvus-lite)
 [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://hub.docker.com/r/kennytian/milvus-lite/tags)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Source](https://img.shields.io/badge/source-GitHub-181717?logo=github)](https://github.com/Kennytian/milvus-lite)
 
 [Milvus Lite](https://milvus.io/docs/milvus_lite.md) is the lightweight, embedded edition of
 [Milvus](https://milvus.io). Upstream ships it as a **Python library only** — there is no official
@@ -203,5 +204,8 @@ description in sync with `README.md` (Account settings → Personal access token
 
 ## License
 
-[MIT](LICENSE). Milvus and Milvus Lite are Apache-2.0 licensed projects of the LF AI & Data Foundation;
+[MIT](LICENSE). Source, issues and the release pipeline live at
+[github.com/Kennytian/milvus-lite](https://github.com/Kennytian/milvus-lite).
+
+Milvus and Milvus Lite are Apache-2.0 licensed projects of the LF AI & Data Foundation;
 this image is an unofficial packaging of the upstream package and comes with no warranty.

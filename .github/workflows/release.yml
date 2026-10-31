@@ -219,6 +219,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push linux/amd64 + linux/arm64
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -251,7 +252,7 @@ jobs:
             echo "${{ steps.meta.outputs.tags }}"
             echo '```'
             echo ""
-            echo "digest: \`${{ steps.meta.outputs.digest }}\`"
+            echo "digest: \`${{ steps.build.outputs.digest }}\`"
             echo ""
             echo "verify: \`docker manifest inspect ${IMAGE}:${VERSION}\`"
           } >> "$GITHUB_STEP_SUMMARY"
