@@ -47,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      pymilvus: ${{ steps.v.outputs.pymilvus }}
       build: ${{ steps.v.outputs.build }}
       bump: ${{ steps.v.outputs.bump }}
     steps:
@@ -92,8 +93,25 @@ jobs:
             fi
           fi
 
+          # Keep pymilvus on the newest release of the same major. Only resolved
+          # when we are about to build, so already published tags stay immutable.
+          pymilvus="$(grep -m1 '^pymilvus==' requirements.txt | cut -d= -f3 | tr -d '[:space:]')"
+          if [ "$build" = "true" ]; then
+            major="${version%%.*}"
+            latest_pm="$(curl -fsSL https://pypi.org/pypi/pymilvus/json \
+              | jq -r '.releases | keys[]' \
+              | grep -E "^${major}\\.[0-9]+(\\.[0-9]+)*$" \
+              | sort -V | tail -n1 || true)"
+            if [ -n "${latest_pm:-}" ] && [ "$latest_pm" != "$pymilvus" ]; then
+              echo "pymilvus: $pymilvus -> $latest_pm"
+              pymilvus="$latest_pm"
+              bump=true
+            fi
+          fi
+
           {
             echo "version=$version"
+            echo "pymilvus=$pymilvus"
             echo "bump=$bump"
             echo "build=$build"
           } >> "$GITHUB_OUTPUT"
@@ -105,6 +123,7 @@ jobs:
             echo "|---|---|"
             echo "| pinned in requirements.txt | \`$pin\` |"
             echo "| building | \`$version\` |"
+            echo "| pymilvus | \`$pymilvus\` |"
             echo "| upstream bump | $bump |"
             echo "| build | $build |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -169,15 +188,17 @@ jobs:
     timeout-minutes: 90
     env:
       VERSION: ${{ needs.resolve.outputs.version }}
+      PYMILVUS: ${{ needs.resolve.outputs.pymilvus }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sync the pin to ${{ needs.resolve.outputs.version }}
+      - name: Sync the pins to ${{ needs.resolve.outputs.version }}
         run: |
           set -euo pipefail
           sed -i "s|^milvus-lite==.*|milvus-lite==${VERSION}|" requirements.txt
+          sed -i "s|^pymilvus==.*|pymilvus==${PYMILVUS}|" requirements.txt
           sed -i -E "s|(kennytian/milvus-lite:)[0-9]+\.[0-9]+\.[0-9]+|\1${VERSION}|g" docker-compose.yml .env.example
-          grep -n '^milvus-lite==' requirements.txt
+          grep -nE '^(pymilvus|milvus-lite)==' requirements.txt
 
       - uses: docker/setup-qemu-action@v3
 
@@ -235,12 +256,14 @@ jobs:
 
       - name: Commit the version bump
         if: needs.resolve.outputs.bump == 'true'
+        env:
+          PYMILVUS: ${{ needs.resolve.outputs.pymilvus }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add requirements.txt docker-compose.yml .env.example
-          git commit -m "chore: bump milvus-lite to ${VERSION} [skip ci]"
+          git commit -m "chore: milvus-lite ${VERSION}, pymilvus ${PYMILVUS} [skip ci]"
           git push || echo "::warning::could not push the bump commit (branch protection?)"
 
       - name: Summary

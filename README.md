@@ -3,13 +3,15 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/kennytian/milvus-lite)](https://hub.docker.com/r/kennytian/milvus-lite)
 [![Image Size](https://img.shields.io/docker/image-size/kennytian/milvus-lite/latest)](https://hub.docker.com/r/kennytian/milvus-lite)
 [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://hub.docker.com/r/kennytian/milvus-lite/tags)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/Kennytian/milvus-lite/blob/master/LICENSE)
 [![Source](https://img.shields.io/badge/source-GitHub-181717?logo=github)](https://github.com/Kennytian/milvus-lite)
 
 [Milvus Lite](https://milvus.io/docs/milvus_lite.md) is the lightweight, embedded edition of
 [Milvus](https://milvus.io). Upstream ships it as a **Python library only** — there is no official
 server. This image wraps it into a **standalone gRPC server** that any Milvus SDK can talk to,
 exactly like a remote Milvus instance.
+
+**Source code, issues and the release pipeline:** <https://github.com/Kennytian/milvus-lite>
 
 ```bash
 docker run -d --name milvus-lite \
@@ -63,7 +65,7 @@ services:
           memory: 1G
 ```
 
-A ready-to-use [`docker-compose.yml`](docker-compose.yml) with `.env` overrides lives in this repo:
+A ready-to-use [`docker-compose.yml`](https://github.com/Kennytian/milvus-lite/blob/master/docker-compose.yml) with `.env` overrides lives in the repository:
 
 ```bash
 docker compose pull && docker compose up -d
@@ -104,7 +106,7 @@ Any other official SDK (Go, Java, Node.js, C#) works as well — just point it a
 | `MILVUS_LITE_BIND_ADDR` | `127.0.0.1` (compose only) | Host address the port is published on |
 | `MILVUS_LITE_HOST_PORT` | `19530` (compose only) | Host port |
 
-Publish to `0.0.0.0` only on a trusted network — see [Security](#security) below.
+Publish to `0.0.0.0` only on a trusted network — see **Security** below.
 
 ## Data, backup and restore
 
@@ -142,12 +144,17 @@ A GitHub Actions workflow keeps the image in lockstep with upstream:
 - **already-published versions are skipped**, so the daily check is cheap;
 - **manual runs** (`workflow_dispatch`) can rebuild any specific version.
 
-The version lives in exactly one place — [`requirements.txt`](requirements.txt):
+The version lives in exactly one place — [`requirements.txt`](https://github.com/Kennytian/milvus-lite/blob/master/requirements.txt):
 
 ```
-pymilvus==3.0.2
+pymilvus==3.0.2      # bumped automatically to the newest 3.x on every build
 milvus-lite==3.2.2   # <- change this line to publish 3.2.3
 ```
+
+**You never have to watch `pymilvus`.** Whenever the workflow builds a new milvus-lite version it
+also resolves the newest `pymilvus` release of the same major from PyPI, installs that, and commits
+the pin back to `requirements.txt`. Already published tags are never rebuilt, so a tag keeps
+pointing at the exact bytes it was published with.
 
 Images are built for both architectures, smoke-tested on `linux/amd64`, and published as a
 multi-arch manifest list.
@@ -204,8 +211,8 @@ description in sync with `README.md` (Account settings → Personal access token
 
 ## License
 
-[MIT](LICENSE). Source, issues and the release pipeline live at
-[github.com/Kennytian/milvus-lite](https://github.com/Kennytian/milvus-lite).
+[MIT](https://github.com/Kennytian/milvus-lite/blob/master/LICENSE). Source, issues and the release pipeline live at
+<https://github.com/Kennytian/milvus-lite>.
 
 Milvus and Milvus Lite are Apache-2.0 licensed projects of the LF AI & Data Foundation;
 this image is an unofficial packaging of the upstream package and comes with no warranty.
