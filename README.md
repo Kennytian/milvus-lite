@@ -46,6 +46,31 @@ docker logs -f milvus-lite
 # MilvusLite gRPC server listening on 0.0.0.0:19530 (data_dir='/data')
 ```
 
+The server starts **unauthenticated** by default. To set a password, pass one of the
+auth environment variables — either a single token, or a username + password pair:
+
+```bash
+# token form
+docker run -d --name milvus-lite \
+  -e MILVUS_LITE_TOKEN=s3cr3t \
+  -p 127.0.0.1:19530:19530 \
+  -v milvus-data:/data \
+  --restart unless-stopped \
+  kennytian/milvus-lite:latest
+
+# username + password form
+docker run -d --name milvus-lite \
+  -e MILVUS_LITE_USERNAME=alice \
+  -e MILVUS_LITE_PASSWORD=w0nder \
+  -p 127.0.0.1:19530:19530 \
+  -v milvus-data:/data \
+  --restart unless-stopped \
+  kennytian/milvus-lite:latest
+```
+
+Once any of the three is set, every RPC must carry matching credentials. See
+**Authentication** below for how clients pass them.
+
 ### docker compose
 
 ```yaml
@@ -53,6 +78,12 @@ services:
   milvus-lite:
     image: kennytian/milvus-lite:latest
     container_name: milvus-lite
+    environment:
+      # Set a password — either a token, or a username + password pair.
+      # Leave all three empty to run unauthenticated.
+      MILVUS_LITE_TOKEN: "s3cr3t"
+      # MILVUS_LITE_USERNAME: alice
+      # MILVUS_LITE_PASSWORD: w0nder
     ports:
       - "127.0.0.1:19530:19530"
     volumes:
@@ -65,9 +96,15 @@ services:
           memory: 1G
 ```
 
-A ready-to-use [`docker-compose.yml`](https://github.com/Kennytian/milvus-lite/blob/master/docker-compose.yml) with `.env` overrides lives in the repository:
+A ready-to-use [`docker-compose.yml`](https://github.com/Kennytian/milvus-lite/blob/master/docker-compose.yml) with `.env` overrides lives in the repository. It wires
+`MILVUS_LITE_TOKEN` / `MILVUS_LITE_USERNAME` / `MILVUS_LITE_PASSWORD` through from a `.env`
+file (copy [`.env.example`](https://github.com/Kennytian/milvus-lite/blob/master/.env.example)
+to `.env` and fill them in):
 
 ```bash
+# .env
+MILVUS_LITE_TOKEN=s3cr3t
+
 docker compose pull && docker compose up -d
 ```
 
