@@ -17,6 +17,7 @@ on:
       - entrypoint.sh
       - requirements.txt
       - docker-compose.yml
+      - README.md
       - scripts/**
       - .github/workflows/release.yml
   workflow_dispatch:
