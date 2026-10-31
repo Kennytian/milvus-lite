@@ -193,7 +193,10 @@ The workflow needs two repository secrets:
 | Secret | Value |
 | --- | --- |
 | `DOCKERHUB_USERNAME` | Docker Hub account that owns the repository |
-| `DOCKERHUB_TOKEN` | Docker Hub access token with **Read & Write** scope (not the password) |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with **Read, Write, Delete** scope (not the password) |
+
+The token needs the delete permission only because the workflow also keeps the Docker Hub
+description in sync with `README.md` (Account settings → Personal access tokens).
 
 `GITHUB_TOKEN` with `contents: write` is used to commit automatic version bumps — check
 *Settings → Actions → General → Workflow permissions*.
