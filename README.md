@@ -143,8 +143,43 @@ Any official SDK works — Python, Go, Java, C# — just point it at `host:19530
 | `MILVUS_LITE_PORT` | `19530` | gRPC port inside the container |
 | `MILVUS_LITE_BIND_ADDR` | `127.0.0.1` (compose only) | Host address the port is published on |
 | `MILVUS_LITE_HOST_PORT` | `19530` (compose only) | Host port |
+| `MILVUS_LITE_TOKEN` | _(empty)_ | Optional: accept a single API token |
+| `MILVUS_LITE_USERNAME` | _(empty)_ | Optional: accept `username:password` (paired with `MILVUS_LITE_PASSWORD`) |
+| `MILVUS_LITE_PASSWORD` | _(empty)_ | Optional: paired with `MILVUS_LITE_USERNAME` |
 
 Publish to `0.0.0.0` only on a trusted network — see **Security** below.
+
+## Authentication
+
+Milvus Lite itself ships no auth, so this image adds a thin, optional **gate** in front of the gRPC
+server. When at least one of `MILVUS_LITE_TOKEN` / `MILVUS_LITE_USERNAME`+`MILVUS_LITE_PASSWORD` is
+set, every RPC must carry matching credentials in the `authorization` metadata — exactly what the
+official SDKs already send. Leave all three empty and the server is unauthenticated, as before.
+
+```bash
+# token form
+docker run -e MILVUS_LITE_TOKEN=s3cr3t -p 127.0.0.1:19530:19530 kennytian/milvus-lite
+
+# username + password form
+docker run -e MILVUS_LITE_USERNAME=alice -e MILVUS_LITE_PASSWORD=w0nder -p 127.0.0.1:19530:19530 kennytian/milvus-lite
+```
+
+Clients pass the same value through their normal SDK auth field — no custom code:
+
+```python
+# token
+MilvusClient(uri, token="s3cr3t")
+# username + password
+MilvusClient(uri, user="alice", password="w0nder")
+```
+
+```js
+new MilvusClient({ address: '127.0.0.1:19530', token: 's3cr3t' });
+```
+
+What this is **not**: it is a single shared credential, not per-user RBAC, and it does not add TLS.
+It only keeps the port from being trivially open to anyone who can reach it. Pair it with a TLS
+terminating proxy (or a private network) when the service leaves the loopback.
 
 ## Data, backup and restore
 
@@ -218,10 +253,11 @@ Run the same smoke test the CI uses:
 
 ## Security
 
-Milvus Lite has **no authentication, no users, no RBAC and no TLS** — upstream explicitly warns
-against exposing it to an untrusted network. Keep the published port bound to `127.0.0.1`, or put a
-proxy with auth/TLS in front of it. The container runs unprivileged, but that does not make the
-service safe to expose.
+Milvus Lite has **no users, no RBAC and no TLS** — upstream explicitly warns against exposing it to
+an untrusted network. This image adds an optional single-credential gate (see **Authentication**),
+but that is not a substitute for TLS or per-user access control. Keep the published port bound to
+`127.0.0.1`, or put a TLS-terminating proxy in front of it. The container runs unprivileged, but that
+does not make the service safe to expose.
 
 ## Limitations (upstream, not the image)
 

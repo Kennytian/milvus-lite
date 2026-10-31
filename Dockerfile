@@ -48,13 +48,16 @@ RUN apt-get update \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:${PATH}" \
+    PYTHONPATH="/opt/milvus-server" \
     MILVUS_LITE_DATA_DIR=/data \
     MILVUS_LITE_HOST=0.0.0.0 \
     MILVUS_LITE_PORT=19530
 
 COPY --from=builder /opt/venv /opt/venv
+COPY auth.py server.py /opt/milvus-server/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod 0755 /usr/local/bin/entrypoint.sh \
+RUN chmod 0644 /opt/milvus-server/*.py \
+    && chmod 0755 /usr/local/bin/entrypoint.sh \
     && groupadd --gid 10001 milvus \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin milvus \
     && mkdir -p /data \

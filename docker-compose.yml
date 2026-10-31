@@ -14,6 +14,13 @@ services:
       MILVUS_LITE_DATA_DIR: /data
       MILVUS_LITE_HOST: 0.0.0.0
       MILVUS_LITE_PORT: "19530"
+      # Optional authentication (all empty = no auth, as before). Set at least
+      # one: a token, or a username + password pair. Clients pass the token or
+      # username/password via their official SDK; the server checks the gRPC
+      # `authorization` metadata on every RPC.
+      MILVUS_LITE_TOKEN: "${MILVUS_LITE_TOKEN:-}"
+      MILVUS_LITE_USERNAME: "${MILVUS_LITE_USERNAME:-}"
+      MILVUS_LITE_PASSWORD: "${MILVUS_LITE_PASSWORD:-}"
 
     ports:
       # Loopback by default: Milvus Lite has no auth/TLS and must not be
