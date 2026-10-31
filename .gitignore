@@ -5,3 +5,6 @@
 # Milvus Lite data directory (keep the folder itself)
 /data/*
 !/data/.gitkeep
+
+# Bun.js / Node.js
+node_modules/

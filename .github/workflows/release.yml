@@ -53,7 +53,7 @@ jobs:
       build: ${{ steps.v.outputs.build }}
       bump: ${{ steps.v.outputs.bump }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: v
         env:
@@ -141,7 +141,7 @@ jobs:
     if: needs.resolve.outputs.bump == 'true' && needs.resolve.outputs.build != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Bump the pin to ${{ needs.resolve.outputs.version }}
         env:
@@ -171,7 +171,7 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Secrets present?
         if: env.DOCKERHUB_TOKEN == ''
@@ -179,7 +179,7 @@ jobs:
 
       - name: Push README.md to the Docker Hub page
         if: env.DOCKERHUB_TOKEN != ''
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
@@ -197,7 +197,7 @@ jobs:
       VERSION: ${{ needs.resolve.outputs.version }}
       PYMILVUS: ${{ needs.resolve.outputs.pymilvus }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Sync the pins to ${{ needs.resolve.outputs.version }}
         run: |
@@ -207,12 +207,12 @@ jobs:
           sed -i -E "s|(kennytian/milvus-lite:)[0-9]+\.[0-9]+\.[0-9]+|\1${VERSION}|g" docker-compose.yml .env.example
           grep -nE '^(pymilvus|milvus-lite)==' requirements.txt
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build linux/amd64 image for the smoke test
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -229,14 +229,14 @@ jobs:
         run: ./scripts/smoke-test.sh milvus-lite:smoke
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Image tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
           flavor: latest=false
@@ -248,7 +248,7 @@ jobs:
 
       - name: Build and push linux/amd64 + linux/arm64
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64

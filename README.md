@@ -73,19 +73,37 @@ docker compose pull && docker compose up -d
 
 ## Connect
 
-The server speaks **gRPC on port 19530**. The official
-[Node.js SDK](https://github.com/milvus-io/milvus-sdk-node) (`@zilliz/milvus2-sdk-node` 3.x — the
-generation that matches Milvus 3.x) talks to it out of the box:
+The server speaks **gRPC on port 19530**. Any official Milvus SDK works — Python, Go, Java, C#,
+Node.js — just point it at `host:19530`. The repository ships two ready-to-run, end-to-end examples
+(create → insert → load → search, with auth) so you can verify a deployment in seconds:
+
+| Language | SDK | Run |
+| --- | --- | --- |
+| **Bun / Node.js** | `@zilliz/milvus2-sdk-node` (3.x) | `bun run demo.ts` |
+| **Python** | `pymilvus` (3.x) | `python demo.py` |
+
+Both live under [`examples/`](https://github.com/Kennytian/milvus-lite/blob/master/examples/) and
+read the same environment variables, so the auth story is identical across languages:
 
 ```bash
-npm install @zilliz/milvus2-sdk-node@3
+# Bun.js
+cd examples/bunjs
+bun install
+MILVUS_LITE_TOKEN=s3cr3t bun run demo.ts
+
+# Python
+cd examples/python
+pip install -r requirements.txt
+MILVUS_LITE_TOKEN=s3cr3t python demo.py
 ```
 
-```js
-// demo.mjs — run with: node demo.mjs
+A minimal Bun.js example, inlined for reference (full source in
+[`examples/bunjs/demo.ts`](https://github.com/Kennytian/milvus-lite/blob/master/examples/bunjs/demo.ts)):
+
+```ts
 import { MilvusClient, DataType, MetricType } from '@zilliz/milvus2-sdk-node';
 
-const client = new MilvusClient({ address: '127.0.0.1:19530' });
+const client = new MilvusClient({ address: '127.0.0.1:19530', token: 's3cr3t' });
 await client.connectPromise;
 
 await client.createCollection({
@@ -93,42 +111,30 @@ await client.createCollection({
   fields: [
     { name: 'id', data_type: DataType.Int64, is_primary_key: true, autoID: true },
     { name: 'text', data_type: DataType.VarChar, max_length: 512 },
-    { name: 'vector', data_type: DataType.FloatVector, dim: 384 },
+    { name: 'vector', data_type: DataType.FloatVector, dim: 8 },
   ],
-  index_params: [
-    {
-      field_name: 'vector',
-      index_type: 'HNSW',
-      metric_type: MetricType.COSINE,
-      params: { M: 16, efConstruction: 256 },
-    },
-  ],
+  index_params: [{ field_name: 'vector', index_type: 'FLAT', metric_type: MetricType.IP, params: {} }],
 });
 
-// Must be loaded before search/query.
 await client.loadCollectionSync({ collection_name: 'demo' });
-
 await client.insert({
   collection_name: 'demo',
   data: [
-    { vector: Array.from({ length: 384 }, (_, i) => (i % 10) / 10), text: 'hello world' },
-    { vector: Array.from({ length: 384 }, (_, i) => ((i + 5) % 10) / 10), text: 'another doc' },
+    { vector: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], text: 'hello world' },
+    { vector: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2], text: 'another doc' },
   ],
 });
 
 const res = await client.search({
   collection_name: 'demo',
-  data: [Array.from({ length: 384 }, (_, i) => (i % 10) / 10)],
+  data: [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
   limit: 2,
-  consistency_level: 'Strong', // see the rows inserted a moment ago
+  consistency_level: 'Strong',
   output_fields: ['text'],
 });
-console.log(res.results); // [ { score: 0.999…, text: 'hello world' }, … ]
-
+console.log(res.results);
 await client.closeConnection();
 ```
-
-Any official SDK works — Python, Go, Java, C# — just point it at `host:19530`.
 
 > The Node.js SDK has no embedded mode — it always needs a reachable server, which is exactly what
 > this image provides. The Python SDK does have one (`MilvusClient("./x.db")`), but never point it at

@@ -1,0 +1,13 @@
+{
+  "name": "milvus-lite-bunjs-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Bun.js example that reads/writes a Milvus Lite collection with auth.",
+  "type": "module",
+  "scripts": {
+    "start": "bun run demo.ts"
+  },
+  "dependencies": {
+    "@zilliz/milvus2-sdk-node": "^3.0.0"
+  }
+}
