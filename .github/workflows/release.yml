@@ -1,0 +1,256 @@
+name: Release
+
+# Build the multi-arch image (linux/amd64 + linux/arm64) and publish it to Docker Hub.
+#
+#  * push / manual run  -> build the version pinned in requirements.txt
+#                          (a manual run may override it)
+#  * daily schedule     -> ask PyPI for the newest milvus-lite; when it is newer
+#                          than the pin, rebuild, retag and commit the bump
+#
+# The version in use always lives in exactly one place: requirements.txt.
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - Dockerfile
+      - entrypoint.sh
+      - requirements.txt
+      - docker-compose.yml
+      - scripts/**
+      - .github/workflows/release.yml
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "milvus-lite version to build (empty = the pin in requirements.txt)"
+        required: false
+        default: ""
+  schedule:
+    # GitHub cron is UTC: 03:23 UTC = 11:23 Asia/Shanghai.
+    - cron: "23 3 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  IMAGE: kennytian/milvus-lite
+  PKG: milvus-lite
+
+jobs:
+  resolve:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+      bump: ${{ steps.v.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: v
+        env:
+          REQUESTED: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          pin="$(grep -m1 '^milvus-lite==' requirements.txt | cut -d= -f3 | tr -d '[:space:]')"
+          [ -n "$pin" ] || { echo "::error::no 'milvus-lite==' pin in requirements.txt"; exit 1; }
+          echo "pinned: $pin"
+
+          version="$pin"
+          bump=false
+
+          if [ -n "${REQUESTED:-}" ]; then
+            version="$REQUESTED"
+            echo "manual override: $version"
+          elif [ "$EVENT" = "schedule" ]; then
+            latest="$(curl -fsSL "https://pypi.org/pypi/${PKG}/json" | jq -r '.info.version')"
+            echo "upstream latest: $latest"
+            if [ "$latest" != "$pin" ]; then
+              newest="$(printf '%s\n%s\n' "$pin" "$latest" | sort -V | tail -n1)"
+              if [ "$newest" = "$latest" ]; then
+                version="$latest"
+                bump=true
+              else
+                echo "upstream $latest is older than the pin, ignoring"
+              fi
+            fi
+          fi
+
+          build=true
+          if [ "$EVENT" != "workflow_dispatch" ]; then
+            code="$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://hub.docker.com/v2/repositories/${IMAGE}/tags/${version}/")"
+            if [ "$code" = "200" ]; then
+              echo "::notice::${IMAGE}:${version} is already published, nothing to do"
+              build=false
+            fi
+          fi
+
+          {
+            echo "version=$version"
+            echo "bump=$bump"
+            echo "build=$build"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Milvus Lite release"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| pinned in requirements.txt | \`$pin\` |"
+            echo "| building | \`$version\` |"
+            echo "| upstream bump | $bump |"
+            echo "| build | $build |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sync-pin:
+    name: Sync requirements.txt
+    needs: resolve
+    if: needs.resolve.outputs.bump == 'true' && needs.resolve.outputs.build != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump the pin to ${{ needs.resolve.outputs.version }}
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s|^milvus-lite==.*|milvus-lite==${VERSION}|" requirements.txt
+          sed -i -E "s|(kennytian/milvus-lite:)[0-9]+\.[0-9]+\.[0-9]+|\1${VERSION}|g" docker-compose.yml .env.example
+          git diff --stat
+
+      - name: Commit
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add requirements.txt docker-compose.yml .env.example
+          git commit -m "chore: bump milvus-lite to ${VERSION} [skip ci]"
+          git push || echo "::warning::could not push the bump commit (branch protection?)"
+
+  description:
+    name: Sync Docker Hub page
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets present?
+        if: env.DOCKERHUB_TOKEN == ''
+        run: echo "::warning::DOCKERHUB_TOKEN is not configured; skipping the Docker Hub description sync"
+
+      - name: Push README.md to the Docker Hub page
+        if: env.DOCKERHUB_TOKEN != ''
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+          repository: ${{ env.IMAGE }}
+          short-description: "Milvus Lite 3.x as a standalone gRPC server — multi-arch, non-root, ~470 MB"
+          readme-filepath: ./README.md
+
+  build:
+    name: Build and push
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync the pin to ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s|^milvus-lite==.*|milvus-lite==${VERSION}|" requirements.txt
+          sed -i -E "s|(kennytian/milvus-lite:)[0-9]+\.[0-9]+\.[0-9]+|\1${VERSION}|g" docker-compose.yml .env.example
+          grep -n '^milvus-lite==' requirements.txt
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build linux/amd64 image for the smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: milvus-lite:smoke
+          build-args: |
+            MILVUS_LITE_VERSION=${{ needs.resolve.outputs.version }}
+            BUILD_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=milvus-lite
+          cache-to: type=gha,mode=max,scope=milvus-lite
+          provenance: false
+
+      - name: Smoke test against the freshly built image
+        run: ./scripts/smoke-test.sh milvus-lite:smoke
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.resolve.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.resolve.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push linux/amd64 + linux/arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            MILVUS_LITE_VERSION=${{ needs.resolve.outputs.version }}
+            BUILD_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=milvus-lite
+          cache-to: type=gha,mode=max,scope=milvus-lite
+          provenance: false
+
+      - name: Commit the version bump
+        if: needs.resolve.outputs.bump == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add requirements.txt docker-compose.yml .env.example
+          git commit -m "chore: bump milvus-lite to ${VERSION} [skip ci]"
+          git push || echo "::warning::could not push the bump commit (branch protection?)"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo ""
+            echo "digest: \`${{ steps.meta.outputs.digest }}\`"
+            echo ""
+            echo "verify: \`docker manifest inspect ${IMAGE}:${VERSION}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

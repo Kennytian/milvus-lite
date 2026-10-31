@@ -1,5 +1,11 @@
 # Milvus Lite as a standalone gRPC server.
 # Multi-arch: linux/amd64, linux/arm64 (all dependencies ship wheels, no compiler needed).
+#
+# The milvus-lite version is pinned in requirements.txt; CI passes it in as
+# MILVUS_LITE_VERSION so the OCI labels and the installed package always agree.
+
+ARG MILVUS_LITE_VERSION=dev
+ARG BUILD_REVISION=unknown
 
 ########################
 # Stage 1: build venv
@@ -22,6 +28,17 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
 # Stage 2: runtime
 ########################
 FROM python:3.12-slim-bookworm
+
+ARG MILVUS_LITE_VERSION
+ARG BUILD_REVISION
+
+LABEL org.opencontainers.image.title="milvus-lite" \
+      org.opencontainers.image.description="Milvus Lite 3.x as a standalone gRPC server (linux/amd64 + linux/arm64)" \
+      org.opencontainers.image.url="https://hub.docker.com/r/kennytian/milvus-lite" \
+      org.opencontainers.image.source="https://github.com/kennytian/milvus-lite" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${MILVUS_LITE_VERSION}" \
+      org.opencontainers.image.revision="${BUILD_REVISION}"
 
 # gosu: drop root after fixing /data ownership, keeps PID 1 signalling correct
 RUN apt-get update \
