@@ -73,28 +73,66 @@ docker compose pull && docker compose up -d
 
 ## Connect
 
-The server speaks **gRPC on port 19530**. Use PyMilvus 3.x (the same generation as Milvus Lite 3.x):
+The server speaks **gRPC on port 19530**. The official
+[Node.js SDK](https://github.com/milvus-io/milvus-sdk-node) (`@zilliz/milvus2-sdk-node` 3.x — the
+generation that matches Milvus 3.x) talks to it out of the box:
 
 ```bash
-pip install "pymilvus==3.0.2"
+npm install @zilliz/milvus2-sdk-node@3
 ```
 
-```python
-from pymilvus import MilvusClient
+```js
+// demo.mjs — run with: node demo.mjs
+import { MilvusClient, DataType, MetricType } from '@zilliz/milvus2-sdk-node';
 
-client = MilvusClient(uri="http://127.0.0.1:19530")   # a URL, not a local .db path
+const client = new MilvusClient({ address: '127.0.0.1:19530' });
+await client.connectPromise;
 
-client.create_collection("demo", dimension=384)
-client.insert("demo", [{"id": 1, "vector": [0.1] * 384, "text": "hello"}])
-client.load_collection("demo")
+await client.createCollection({
+  collection_name: 'demo',
+  fields: [
+    { name: 'id', data_type: DataType.Int64, is_primary_key: true, autoID: true },
+    { name: 'text', data_type: DataType.VarChar, max_length: 512 },
+    { name: 'vector', data_type: DataType.FloatVector, dim: 384 },
+  ],
+  index_params: [
+    {
+      field_name: 'vector',
+      index_type: 'HNSW',
+      metric_type: MetricType.COSINE,
+      params: { M: 16, efConstruction: 256 },
+    },
+  ],
+});
 
-print(client.search("demo", data=[[0.1] * 384], limit=1, output_fields=["text"]))
+// Must be loaded before search/query.
+await client.loadCollectionSync({ collection_name: 'demo' });
+
+await client.insert({
+  collection_name: 'demo',
+  data: [
+    { vector: Array.from({ length: 384 }, (_, i) => (i % 10) / 10), text: 'hello world' },
+    { vector: Array.from({ length: 384 }, (_, i) => ((i + 5) % 10) / 10), text: 'another doc' },
+  ],
+});
+
+const res = await client.search({
+  collection_name: 'demo',
+  data: [Array.from({ length: 384 }, (_, i) => (i % 10) / 10)],
+  limit: 2,
+  consistency_level: 'Strong', // see the rows inserted a moment ago
+  output_fields: ['text'],
+});
+console.log(res.results); // [ { score: 0.999…, text: 'hello world' }, … ]
+
+await client.closeConnection();
 ```
 
-Any other official SDK (Go, Java, Node.js, C#) works as well — just point it at `host:19530`.
+Any official SDK works — Python, Go, Java, C# — just point it at `host:19530`.
 
-> `MilvusClient("./x.db")` opens the *embedded* engine in-process. Do not point it at the container's
-> data directory: the file lock means only one process can own it. Always use the URL.
+> The Node.js SDK has no embedded mode — it always needs a reachable server, which is exactly what
+> this image provides. The Python SDK does have one (`MilvusClient("./x.db")`), but never point it at
+> the container's data directory: the file lock allows a single process only. Use the URL.
 
 ## Configuration
 
@@ -155,6 +193,9 @@ milvus-lite==3.2.2   # <- change this line to publish 3.2.3
 also resolves the newest `pymilvus` release of the same major from PyPI, installs that, and commits
 the pin back to `requirements.txt`. Already published tags are never rebuilt, so a tag keeps
 pointing at the exact bytes it was published with.
+
+If you want a `pymilvus`-only refresh between milvus-lite releases, run the workflow manually
+(*Actions → Release → Run workflow*) — a manual run always rebuilds, even for an existing tag.
 
 Images are built for both architectures, smoke-tested on `linux/amd64`, and published as a
 multi-arch manifest list.
