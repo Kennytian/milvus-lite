@@ -86,7 +86,12 @@ jobs:
           fi
 
           build=true
-          if [ "$EVENT" != "workflow_dispatch" ]; then
+          # Only the scheduled poll skips when the tag already exists (it is
+          # just checking for upstream bumps). A push means the source changed
+          # (Dockerfile, entrypoint.sh, auth.py, ...) and must always rebuild
+          # and re-publish, even at the same version. Manual dispatch also
+          # always builds.
+          if [ "$EVENT" = "schedule" ]; then
             code="$(curl -s -o /dev/null -w '%{http_code}' \
               "https://hub.docker.com/v2/repositories/${IMAGE}/tags/${version}/")"
             if [ "$code" = "200" ]; then
