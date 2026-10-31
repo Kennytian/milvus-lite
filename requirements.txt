@@ -1,0 +1,5 @@
+# Milvus Lite 3.x is served by milvus-lite's bundled gRPC adapter.
+# Documentation pins these two versions together (see
+# https://milvus.io/docs/milvus_lite.md).
+pymilvus==3.0.2
+milvus-lite==3.2.2

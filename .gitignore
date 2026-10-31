@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+.env
+
+# Milvus Lite data directory (keep the folder itself)
+/data/*
+!/data/.gitkeep

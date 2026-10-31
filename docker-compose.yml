@@ -1,0 +1,43 @@
+name: milvus-lite
+
+services:
+  milvus-lite:
+    image: ${MILVUS_LITE_IMAGE:-kennytian/milvus-lite:3.2.2}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milvus-lite
+
+    environment:
+      # The data dir is a *directory* (collections/, LOCK, ...), not a single
+      # .db file — that is the Milvus Lite 3.x storage format.
+      MILVUS_LITE_DATA_DIR: /data
+      MILVUS_LITE_HOST: 0.0.0.0
+      MILVUS_LITE_PORT: "19530"
+
+    ports:
+      # Loopback by default: Milvus Lite has no auth/TLS and must not be
+      # exposed to an untrusted network. Set MILVUS_LITE_BIND_ADDR=0.0.0.0
+      # only on a trusted LAN.
+      - "${MILVUS_LITE_BIND_ADDR:-127.0.0.1}:${MILVUS_LITE_HOST_PORT:-19530}:19530"
+
+    volumes:
+      - ./data:/data
+
+    restart: unless-stopped
+    # Graceful shutdown: SIGINT lets the server drain RPCs and release the LOCK.
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+
+    # Compose v2 honours deploy.resources even outside Swarm.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
