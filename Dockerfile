@@ -35,7 +35,7 @@ ARG BUILD_REVISION
 LABEL org.opencontainers.image.title="milvus-lite" \
       org.opencontainers.image.description="Milvus Lite 3.x as a standalone gRPC server (linux/amd64 + linux/arm64)" \
       org.opencontainers.image.url="https://hub.docker.com/r/kennytian/milvus-lite" \
-      org.opencontainers.image.source="https://github.com/kennytian/milvus-lite" \
+      org.opencontainers.image.source="https://github.com/Kennytian/milvus-lite" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${MILVUS_LITE_VERSION}" \
       org.opencontainers.image.revision="${BUILD_REVISION}"
