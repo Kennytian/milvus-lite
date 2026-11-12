@@ -29,8 +29,8 @@ on:
         required: false
         default: ""
   schedule:
-    # GitHub cron is UTC: 03:23 UTC = 11:23 Asia/Shanghai.
-    - cron: "23 3 * * *"
+    # GitHub cron is UTC: 03:23 UTC = 11:23 Asia/Shanghai. runs every Thursday
+    - cron: "23 3 * * 4"
 
 permissions:
   contents: write
